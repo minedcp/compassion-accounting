@@ -37,3 +37,27 @@ class BankStatementLine(models.Model):
                 {"account_id": res.journal_id.payment_debit_account_id.id, "move_id": res.id, "debit": 0,
                  "credit": self.amount}))
         return res
+
+    def reconcile(self, lines_vals_list, to_check=False):
+        super().reconcile( lines_vals_list, to_check)
+        add_lines=False
+        company = self.move_id.company_id
+        param_obj = self.env["res.config.settings"].sudo().with_company(company)
+        account_offbalance_receivable = (param_obj.get_param("account_offbalance_receivable"))
+        account_offbalance_asset = (param_obj.get_param("account_offbalance_asset"))
+        for l in self.move_id.line_ids:
+            if l.account_id.id == account_offbalance_receivable:
+                add_lines = True
+        if add_lines:
+            for l in lines_vals_list:
+                if l['id']:
+                    counterpart_reconciled = self.env["account.move.line"].browse(l["id"])
+                    if account_offbalance_receivable == counterpart_reconciled.account_id.id:
+                        self.move_id.line_ids += (
+                            self.env["account.move.line"].with_context(check_move_validity=False).create(
+                                {"account_id": account_offbalance_asset, "move_id": self.move_id.id, "debit": self.amount,
+                                 "credit": 0}
+                            ) + self.env["account.move.line"].with_context(check_move_validity=False).create(
+                            {"account_id": self.move_id.journal_id.payment_debit_account_id.id, "move_id": self.move_id.id, "debit": 0,
+                             "credit": self.amount}))
+
