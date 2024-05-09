@@ -17,6 +17,10 @@ def migrate(cr, version):
             having count(*) = 1)
         """
         )
+        cr.execute("""
+            ALTER TABLE account_move_recurring_contract_rel
+            DROP COLUMN account_invoice_id;
+        """)
         cr.execute(
             """INSERT INTO account_move_recurring_contract_rel (recurring_contract_id,
                     account_move_id)
@@ -27,7 +31,3 @@ def migrate(cr, version):
                  AND m.payment_state != 'paid' AND m.state = 'posted'
                  AND aml.due_date < NOW()""",
         )
-        cr.execute("""
-            ALTER TABLE account_move_recurring_contract_rel
-            DROP COLUMN account_invoice_id;
-        """)
