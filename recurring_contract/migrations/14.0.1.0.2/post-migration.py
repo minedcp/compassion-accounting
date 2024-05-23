@@ -17,10 +17,12 @@ def migrate(cr, version):
             having count(*) = 1)
         """
         )
-        cr.execute("""
+        cr.execute(
+            """
             ALTER TABLE account_move_recurring_contract_rel
             DROP COLUMN account_invoice_id;
-        """)
+        """
+        )
         cr.execute(
             """INSERT INTO account_move_recurring_contract_rel (recurring_contract_id,
                     account_move_id)
