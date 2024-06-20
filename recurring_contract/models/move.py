@@ -31,8 +31,12 @@ class AccountMove(models.Model):
             payment_dates = []
             for line in invoice.line_ids:
                 if line.reconciled and line.full_reconcile_id:
-                    mv_filter = "credit" if invoice.move_type == "out_invoice" else "debit"
-                    payment_lines = line.full_reconcile_id.reconciled_line_ids.filtered(lambda r: r[mv_filter])
+                    mv_filter = (
+                        "credit" if invoice.move_type == "out_invoice" else "debit"
+                    )
+                    payment_lines = line.full_reconcile_id.reconciled_line_ids.filtered(
+                        lambda r, _mv_filter=mv_filter: r[_mv_filter]
+                    )
                     payment_dates.extend(payment_lines.mapped("date"))
             if payment_dates:
                 invoice.last_payment = max(payment_dates)
