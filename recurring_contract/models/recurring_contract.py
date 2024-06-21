@@ -444,7 +444,10 @@ class RecurringContract(models.Model):
     def contract_waiting(self):
         if self.filtered(lambda c: c.state == "active"):
             raise UserError(_("Active contract cannot be put to waiting"))
-        if self.filtered(lambda c: not c.total_amount) and self.type not in ('SWP','SC'):
+        if self.filtered(lambda c: not c.total_amount) and self.type not in (
+            "SWP",
+            "SC",
+        ):
             raise UserError(_("Please configure contract lines"))
         self.write({"state": "waiting", "start_date": fields.Datetime.now()})
         self.generate_invoices()
