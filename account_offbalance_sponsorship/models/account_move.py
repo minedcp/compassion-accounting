@@ -51,7 +51,23 @@ class AccountMoveLine(models.Model):
         )
 
     def reconcile(self):
+        #check if there is a currency diff and relaod the invoice with the rate received
+        total = total_curr = 0
+        for l in self:
+            total=l.debit-l.credit+total
+            total_curr=l.amount_currency+total_curr
+        if total != 0 and total_curr == 0:
+            inv_to_refresh=self.filtered(lambda l:l.move_id.journal_id.type == 'sale').move_id
+            nr = self.filtered(lambda l: l.move_id.journal_id.type != 'sale')
+            new_rate=sum(n.amount_currency for n in nr)/sum(n.debit-n.credit for n in nr)
+            inv_to_refresh.button_draft()
+            for line in inv_to_refresh.line_ids:
+                line.debit = abs(line.amount_currency/new_rate) if line.amount_currency>0 else 0
+                line.credit = abs(line.amount_currency/new_rate) if line.amount_currency<0 else 0
+            inv_to_refresh.action_post()
+        #reconcile
         res = super().reconcile()
+        #check if the reconcile is regarding off balance moves
         (
             account_offbalance_receivable,
             account_offbalance_asset,
