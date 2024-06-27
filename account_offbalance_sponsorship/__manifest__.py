@@ -40,11 +40,9 @@
     "depends": [
         "base",
         "sponsorship_compassion",
-        #'account_reconcile_compassion',
     ],
     # always loaded
     "data": [
-        # 'security/ir.model.access.csv',
         "views/res_config_view.xml",
     ],
 }
