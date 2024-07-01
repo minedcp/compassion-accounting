@@ -40,6 +40,7 @@
     "depends": [
         "base",
         "sponsorship_compassion",
+        "account_reconciliation_widget",
     ],
     # always loaded
     "data": [
