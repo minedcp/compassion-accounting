@@ -49,7 +49,7 @@ class AccountMoveLine(models.Model):
             nr = filtered_item.filtered(lambda l: l.move_id.journal_id.type != 'sale')
             new_rate = sum(n.amount_currency for n in nr) / sum(n.debit - n.credit for n in nr)
             inv_to_refresh.button_draft()
-            for line in inv_to_refresh.line_ids:
+            for line in inv_to_refresh.line_ids.with_context(check_move_validity=False):
                 line.debit = abs(line.amount_currency / new_rate) if line.amount_currency > 0 else 0
                 line.credit = abs(line.amount_currency / new_rate) if line.amount_currency < 0 else 0
             inv_to_refresh.action_post()
@@ -75,12 +75,13 @@ class AccountMoveLine(models.Model):
         rec_lines = pmt_move.line_ids
         off_rec, off_ass = rec_lines.get_account_offbalance(inv_move.company_id)
         if rec_lines.filtered(lambda r: r.account_id.id == off_rec):
-            pmt_move.with_context(skip_account_move_synchronization=True).write({"state": "draft"})
-            ids_to_unlink = self.env["account.move.line"]
-            for move_name in inv_move.mapped("name"):
-                ids_to_unlink += rec_lines.filtered(lambda l: l.account_id.id != off_rec and l.name == move_name)
-            pmt_move.line_ids -= ids_to_unlink
-            pmt_move.write({"state": "posted"})
+            for pmt in pmt_move:
+                pmt.with_context(skip_account_move_synchronization=True).write({"state": "draft"})
+                ids_to_unlink = self.env["account.move.line"]
+                for move_name in inv_move.mapped("name"):
+                    ids_to_unlink += rec_lines.filtered(lambda l: l.account_id.id != off_rec and l.name == move_name)
+                pmt.line_ids -= ids_to_unlink
+                pmt.write({"state": "posted"})
 
         return True
 
@@ -155,7 +156,8 @@ class AccountMoveLine(models.Model):
 
     def remove_move_reconcile(self):
         """Undo a reconciliation"""
-        inv_move = self.matched_debit_ids.debit_move_id.move_id+self.matched_credit_ids.debit_move_id.move_id
-        pmt_move = self.matched_credit_ids.credit_move_id.move_id+self.matched_debit_ids.credit_move_id.move_id
-        self.remove_off_balance_lines(inv_move, pmt_move)
+        if not self._context.get('bypass_offbalance_operations'):
+            inv_move = self.matched_debit_ids.debit_move_id.move_id+self.matched_credit_ids.debit_move_id.move_id
+            pmt_move = self.matched_credit_ids.credit_move_id.move_id+self.matched_debit_ids.credit_move_id.move_id
+            self.remove_off_balance_lines(inv_move, pmt_move)
         super().remove_move_reconcile()
