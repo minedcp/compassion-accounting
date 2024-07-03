@@ -311,12 +311,17 @@ class ContractGroup(models.Model):
         self.ensure_one()
         dangling_invoices = self.env["account.move"].search(
             [
+                "|",
+                "&",
                 ("invoice_date_due", "=", invoicing_date),
                 ("partner_id", "=", self.partner_id.id),
-                "|",
+                "&",
+                "&",
+                "&",
+                "&",
+                ("move_type", "=", "out_invoice"),
                 ("state", "=", "cancel"),
                 ("payment_state", "not in", ["paid", "not_paid"]),
-                ("move_type", "=", "out_invoice"),
                 ("line_ids.contract_id", "in", self.active_contract_ids.ids),
                 (
                     "line_ids.product_id",
@@ -325,11 +330,10 @@ class ContractGroup(models.Model):
                 ),
             ]
         )
-        return (
-            dangling_invoices
-            or self.invoice_suspended_until
-            and self.invoice_suspended_until > invoicing_date
-        )
+        # Check for contract group suspension
+        is_suspended = self.invoice_suspended_until and self.invoice_suspended_until > invoicing_date
+
+        return bool(dangling_invoices) or is_suspended
 
     def _process_invoice_generation(self, invoicer, invoicing_date):
         self.ensure_one()
