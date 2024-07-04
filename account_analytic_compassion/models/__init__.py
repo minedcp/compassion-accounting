@@ -9,6 +9,4 @@
 
 from . import account
 from . import account_asset
-from . import res_config_setting
-from . import exchange_rate_analytic_tag
 from . import product
