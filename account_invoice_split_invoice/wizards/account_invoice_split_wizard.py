@@ -31,9 +31,27 @@ class SplitInvoiceWizard(models.TransientModel):
         readonly=False,
     )
 
+    line_ids = fields.Many2many(
+        "account.move.line",
+        string="Journal Items",
+        compute="_compute_line_ids",
+        readonly=False,
+    )
+
     @api.model
     def _get_invoice(self):
         return self.env.context.get("active_id")
+
+    @api.depends('invoice_line_ids')
+    def _compute_line_ids(self):
+        for wizard in self:
+            if wizard.invoice_line_ids:
+                move_ids = wizard.invoice_line_ids.mapped('move_id').ids
+                # Fetch all lines for the invoices, including the receivable line
+                all_lines = self.env['account.move.line'].search([('move_id', 'in', move_ids)])
+                # Filter to only include lines related to the selected invoice lines and the receivable line
+                relevant_lines = all_lines.filtered(lambda l: l.id in wizard.invoice_line_ids.ids or l.account_id.internal_type == 'receivable')
+                wizard.line_ids = relevant_lines
 
     def split_invoice(self):
         self.ensure_one()
@@ -47,6 +65,7 @@ class SplitInvoiceWizard(models.TransientModel):
                 if was_open:
                     old_invoice.button_draft()
                     old_invoice.env.clear()
+                self.invoice_line_ids.move_id.write({"line_ids": self.line_ids})
                 self.invoice_line_ids.write({"move_id": invoice.id})
                 if was_open:
                     old_invoice.action_post()
@@ -58,5 +77,6 @@ class SplitInvoiceWizard(models.TransientModel):
         new_invoice = old_invoice.copy(
             default={"invoice_date": old_invoice.invoice_date}
         )
+        new_invoice.line_ids.unlink()
         new_invoice.invoice_line_ids.unlink()
         return new_invoice
